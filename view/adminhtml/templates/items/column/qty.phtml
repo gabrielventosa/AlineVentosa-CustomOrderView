@@ -40,8 +40,16 @@
         <?php endif; ?>
 
             <tr>
-                <th><?= __('Inventory'); ?></th>
-                <td><?= $block->getStockRepository();?> </td>
+                <?php
+                foreach($block->getStockQty() as $d){
+                    ?>
+                    <!-- <th><?= __('Inventory'); ?></th> -->
+                    <td><?= $d[0] . ": "; ?> </td>
+                    <td><?= $d[1]; ?> </td>
+                    <?php
+                }
+                ?>
+
             </tr>
     </table>
 <?php endif; ?>

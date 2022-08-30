@@ -9,7 +9,9 @@ use Magento\Sales\Model\Order\Creditmemo\Item as CreditmemoItem;
 use Magento\Sales\Model\Order\Invoice\Item as InvoiceItem;
 use Magento\Sales\Model\Order\Item;
 use Magento\Quote\Model\Quote\Item\AbstractItem as QuoteItem;
-use Magento\CatalogInventory\Api\StockRepositoryInterface;
+use Magento\InventoryApi\Api\StockRepositoryInterface;
+use Magento\InventorySalesApi\Model\GetStockItemDataInterface;
+
 
 /**
  * Sales Order items qty column renderer
@@ -29,19 +31,27 @@ class Qty extends \Magento\Sales\Block\Adminhtml\Items\Column\DefaultColumn
     protected $_optionFactory;
 
     /**
-     * Option factory
+     *  StockRepositoryInterface
      *
-     * @var Magento\CatalogInventory\Api\StockRepositoryInterface
+     * @var Magento\InventoryApi\Api\StockRepositoryInterface
      */
     protected $stockRepositoryInterface;
+
+    /**
+     * stockRepositoryInterface
+     *
+     * @var Magento\InventorySalesApi\Model\GetStockItemDataInterface
+     */
+    protected $stockItemDataInterface;
 
     /**
      * @param \Magento\Backend\Block\Template\Context $context
      * @param \Magento\CatalogInventory\Api\StockRegistryInterface $stockRegistry
      * @param \Magento\CatalogInventory\Api\StockConfigurationInterface $stockConfiguration
-     * @param \Magento\Framework\Registry $registry
+     * @param \Magento\Frameword\Registry $registry
      * @param \Magento\Catalog\Model\Product\OptionFactory $optionFactory
      * @param StockRepositoryInterface $stockRepositoryInterface
+     * @param GetStockItemDataInterface $stocItemDataInterface
      * @param array $data
      */
     public function __construct(
@@ -51,17 +61,48 @@ class Qty extends \Magento\Sales\Block\Adminhtml\Items\Column\DefaultColumn
         \Magento\Framework\Registry $registry,
         \Magento\Catalog\Model\Product\OptionFactory $optionFactory,
         StockRepositoryInterface $stockRepositoryInterface,
+        GetStockItemDataInterface $stockItemDataInterface,
         array $data = []
     ) {
         $this->_optionFactory = $optionFactory;
         $this->stockRepositoryInterface = $stockRepositoryInterface;
+        $this->stockItemDataInterface = $stockItemDataInterface;
         parent::__construct($context, $stockRegistry, $stockConfiguration, $registry, $optionFactory, $data);
     }
 
     public function getStockRepository()
     {
+        $stockData = array();
         $stock_rpsi = $this->stockRepositoryInterface->getList();
-        $productId = $this->getItem()->getId();
+        foreach ($stock_rpsi->getItems() as $stk) {
+            $stockId = $stk->getStockId();
+            $stockName = $stk->getName();
+            $sku = $this->getSku();
+            $stockData[] = array($stockId, $stockName, $sku);
+        }
+        return $stockData;
+    }
+
+    public function getStockQty()
+    {
+        $stockData = $this->getStockRepository();
+        $options = $this->getItem()->getProductOptions();
+        $sku = $options['simple_sku'];
+        //$sku = $this->getSku();
+        $stocks = array();
+        foreach ($stockData as $stk) {
+            $stockId = $stk[0];
+            $stockName = $stk[1];
+            $stockItemData = $this->stockItemDataInterface->execute($sku, $stockId);
+            if (is_null($stockItemData)) {
+                continue;
+            }
+            $stock = round($stockItemData["quantity"]);
+            $stocks[] = array($stockName, $stock);
+        }
+        return $stocks;
+    }
+        /*
         $productDetails = $this->product->create()->load($productId);
         $proType = $productDetails->getTypeId();
         $result = array();
@@ -89,5 +130,5 @@ class Qty extends \Magento\Sales\Block\Adminhtml\Items\Column\DefaultColumn
         }
         return $result;
     }
-
+ */
 }
